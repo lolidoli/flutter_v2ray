@@ -226,6 +226,14 @@ abstract class V2RayURL {
         "multiMode": mode == "multi",
       };
       sni = host ?? "";
+    } else if (transport == 'xhttp') {
+      streamSetting['network'] = 'xhttp';
+      streamSetting['xhttpSettings'] = {
+        "host": host ?? "",
+        "mode": mode ?? "auto",
+        "path": path ?? "/"
+      };
+      sni = host ?? "";
     }
     return sni;
   }
