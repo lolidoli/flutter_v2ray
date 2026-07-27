@@ -98,8 +98,34 @@ public class V2rayVPNService extends VpnService implements V2rayServicesListener
         builder.setMtu(1500);
         builder.addAddress("26.26.26.1", 30);
 
+        // IPv6: без собственного адреса и маршрута в туннеле система оставляет
+        // IPv6-трафик снаружи, и он идёт напрямую с настоящего адреса
+        // пользователя. Для VPN это тихая потеря защиты: у большинства крупных
+        // сайтов (Google, YouTube, Cloudflare) есть AAAA-записи, и телефон в
+        // сети с IPv6 (домашний роутер, любой современный оператор) пойдёт к
+        // ним в обход туннеля, пока приложение показывает «подключено».
+        // Адрес — ULA из fc00::/7, он не маршрутизируется в интернете и нужен
+        // только чтобы система согласилась завести IPv6 на интерфейсе.
+        // Если у сервера нет IPv6-выхода, соединения просто не установятся и
+        // клиенты вернутся к IPv4 (Happy Eyeballs) — это безопасный отказ,
+        // в отличие от утечки.
+        boolean ipv6Ok = false;
+        try {
+            builder.addAddress("fdfe:dcba:9876::1", 126);
+            ipv6Ok = true;
+        } catch (Exception e) {
+            // Устройство без поддержки IPv6 в VpnService — не повод падать.
+        }
+
         if (v2rayConfig.BYPASS_SUBNETS == null || v2rayConfig.BYPASS_SUBNETS.isEmpty()) {
             builder.addRoute("0.0.0.0", 0);
+            if (ipv6Ok) {
+                try {
+                    builder.addRoute("::", 0);
+                } catch (Exception e) {
+                    // Маршрут не приняли — остаёмся на IPv4-туннеле.
+                }
+            }
         } else {
             for (String subnet : v2rayConfig.BYPASS_SUBNETS) {
                 String[] parts = subnet.split("/");
